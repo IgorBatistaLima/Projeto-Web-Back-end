@@ -1,0 +1,19 @@
+{
+  "name": "projeto-web-back-end",
+  "version": "1.0.0",
+  "description": "Projeto Final de Web-Back-End",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IgorBatistaLima/Projeto-Web-Back-end.git"
+  },
+  "author": "Igor Batista Lima",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/IgorBatistaLima/Projeto-Web-Back-end/issues"
+  },
+  "homepage": "https://github.com/IgorBatistaLima/Projeto-Web-Back-end#readme"
+}
