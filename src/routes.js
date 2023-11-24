@@ -6,8 +6,8 @@ routes.get('/', (req, res) => {
   res.send('hello');
 });
 
-routes.get('/login', (req, res) => {
-    res.json('login');
+routes.post('/login', (req, res) => {
+   
 });
 
 app.use(routes);
