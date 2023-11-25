@@ -9,6 +9,7 @@ const UserController = {
         try {
             const user = await User.create({ username, password, email, isAdmin, role });
             return res.send({ user });
+            return res.send('usuário criado com sucesso');
         } catch (err) {
             return res.status(400).send({ error: 'Falha ao registrar o usuário' });
         }
