@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
+const bcrypt = require('bcrypt');
 
 const UserSchema = new Schema({
     username: {
@@ -20,13 +21,18 @@ const UserSchema = new Schema({
         default: false,
         required: true,
     },
-    role : {
+    role: {
         type: String,
-        enum : ['user', 'admin'],
-        default : 'user'
+        enum: ['user', 'admin'],
+        default: 'user'
     },
 
-    });
+});
 
-module.exports = mongoose.model('User', UserSchema);
+UserSchema.methods.comparePassword = function (password) {
+    return bcrypt.compare(password, this.password);
+};
 
+const User = mongoose.model('User', UserSchema);
+
+module.exports = User;
