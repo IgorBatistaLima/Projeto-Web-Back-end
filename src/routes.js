@@ -14,7 +14,7 @@ routes.post('/login', login);
 
 
 routes.get('/profile', authenticate, (req, res) => {
-    res.json({ message: `Welcome ${req.user.username}` });
+    
 });
 
 routes.post('/users', UserController.createUser);
