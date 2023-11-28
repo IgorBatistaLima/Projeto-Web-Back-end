@@ -1,19 +1,26 @@
 
-const User = require('../models/User'); // Substitua '../models/User' pelo caminho correto para o arquivo User.js
+const User = require('../models/User'); 
+const Admin = require('../models/Admin');
+
 
 const UserController = {
     // Criar um usuário
     createUser: async (req, res) => {
-        const { username, password, email, isAdmin, role } = req.body;
+        const { username, password, email,isAdmin, role} = req.body;
 
         try {
-            const user = await User.create({ username, password, email, isAdmin, role });
+            let user;
+            if (isAdmin === 'true') {
+                user = await Admin.create({ username, password, email, isAdmin, role });
+            } else {
+                user = await User.create({ username, password, email, isAdmin, role });
+            }
             return res.send({ user });
-            return res.send('usuário criado com sucesso');
         } catch (err) {
             return res.status(400).send({ error: 'Falha ao registrar o usuário' });
         }
     },
+
 
     // Buscar um usuário
     getUser: async (req, res) => {
