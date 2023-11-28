@@ -3,11 +3,15 @@ const routes = new Router();
 const UserController = require('./controllers/UserController');
 const {register, login} = require('./controllers/auth');
 const { authenticate } = require('./middlewares/auth');
+const { createAdminUser , Admin } = require('./models/Admin');
 
 
-routes.get('/', (req, res) => {
+routes.get('/', async (req, res) => {
+    await createAdminUser();
     res.send('Hello World');
 });
+
+
 
 routes.post('/register', register);
 routes.post('/login', login);
