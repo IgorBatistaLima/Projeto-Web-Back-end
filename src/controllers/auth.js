@@ -1,21 +1,32 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/User');
+const { Admin} = require('../models/Admin');
 require('dotenv').config();
 
 const register = async (req, res, next) => {
-    const { username, email, password } = req.body;
-  
+  const { username, email, password, role } = req.body;
+
+  if(role === 'admin') {
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = new User({ username, email, password: hashedPassword });
+      const admin = new Admin({ username, email, password: hashedPassword, role });
+      await admin.save();
+      res.json({ message: 'Registration successful' });
+    } catch (error) {
+      next(error);
+    }
+  } else {
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = new User({ username, email, password: hashedPassword, role });
       await user.save();
       res.json({ message: 'Registration successful' });
     } catch (error) {
       next(error);
     }
-  };
-  
+  }
+};
   
   const login = async (req, res, next) => {
     const { username, password } = req.body;
