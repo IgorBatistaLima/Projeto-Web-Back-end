@@ -19,12 +19,11 @@ const UserSchema = new Schema({
     isAdmin: {
         type: Boolean,
         default: false,
-        required: true,
     },
     role: {
         type: String,
         enum: ['user', 'admin'],
-        default: 'user'
+        default: 'user',
     },
 
 });
@@ -32,6 +31,7 @@ const UserSchema = new Schema({
 UserSchema.methods.comparePassword = function (password) {
     return bcrypt.compare(password, this.password);
 };
+
 
 const User = mongoose.model('User', UserSchema);
 
