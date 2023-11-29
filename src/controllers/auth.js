@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/User');
-const { Admin} = require('../models/Admin');
+const {Admin} = require('../models/Admin');
 require('dotenv').config();
 
 const register = async (req, res, next) => {
@@ -28,26 +28,36 @@ const register = async (req, res, next) => {
   }
 };
   
-  const login = async (req, res, next) => {
-    const { username, password } = req.body;
-  
-    try {
-      const user = await User.findOne({ username });
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-  
-      const passwordMatch = await user.comparePassword(password);
-      if (!passwordMatch) {
-        return res.status(401).json({ message: 'Incorrect password' });
-      }
-  
-      const token = jwt.sign({ _id: user._id }, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.cThIIoDvwdueQB468K5xDc5633seEFoqwxjF_xSJyQQ');
+const login = async (req, res, next) => {
+  const { username, password } = req.body;
 
-  res.json({ token });
-    } catch (error) {
-      next(error);
+  try {
+    // Buscar o usuário (ou admin) pelo nome de usuário
+    const user = await User.findOne({ username }) || await Admin.findOne({ username });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
-  };
+
+    // Comparar a senha fornecida com a senha armazenada
+    const passwordMatch = await user.comparePassword(password);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Incorrect password' });
+    }
+
+    // Verificar se o usuário é um administrador
+    if (user.role === 'admin') {
+      console.log('User is an admin');
+    } else {
+      console.log('User is not an admin');
+    }
+
+
+    const token = jwt.sign({ _id: user._id, role: user.role }, process.env.SECRET_KEY, { expiresIn: '1h' });
+    res.json({ token });
+  } catch (error) {
+    next(error);
+  }
+};
   
   module.exports = { register, login };
