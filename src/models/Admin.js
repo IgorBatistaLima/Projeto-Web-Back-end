@@ -1,6 +1,5 @@
 
 const bcrypt = require('bcrypt');
-const User = require('../models/User');
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
@@ -37,16 +36,20 @@ const AdminSchema = new Schema({
 AdminSchema.methods.comparePassword = function (password) {
     return bcrypt.compare(password, this.password);
 };
+const Admin = mongoose.model('Admin', AdminSchema);
+
 
 
 
 async function createAdminUser() {
   const adminUser = await Admin.findOne({ username: 'admin' });
+  const saltRounds = 10;
+  const hashedPassword = await bcrypt.hash('admin123', saltRounds);
   
   if (!adminUser) {
     const admin = new Admin({
       username: 'admin',
-      password: 'password',
+      password: hashedPassword,
       email: 'admin@example.com',
       role: 'admin',
     });
@@ -57,10 +60,19 @@ async function createAdminUser() {
   }
 }
 
+const verifyAdmin = (req, res, next) => {
+    if (req.user && req.user.role === 'admin') {
+      next();
+    } else {
+      res.status(403).json({ message: 'User is not an admin' });
+    }
+  };
+  
 
-const Admin = mongoose.model('Admin', AdminSchema);
 
-module.exports = { Admin, createAdminUser };
+
+
+module.exports = { Admin, createAdminUser, verifyAdmin };
 
 
 
