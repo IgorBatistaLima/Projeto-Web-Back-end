@@ -85,6 +85,25 @@ routes.put('/admin/update/:username', auth, isAdmin, async (req, res) => {
 }
 );
 
+router.put('/user/update/:username', auth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username });
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+    if (req.user.username !== user.username && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Você não tem permissão para atualizar este usuário' });
+    }
+    user.set(req.body);
+    await user.save();
+    res.json(user);
+  } catch (error) {
+    console.error(error); // Imprime o erro no console
+    res.status(500).json({ error: 'Erro ao atualizar o usuário', details: error.message }); // Envia o erro na resposta
+  }
+});
+
+routes
 
 
 routes.post('/users', UserController.createUser);
