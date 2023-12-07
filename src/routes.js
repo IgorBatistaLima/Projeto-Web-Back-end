@@ -6,7 +6,11 @@ const  auth  = require('./middlewares/auth');
 const {User ,createAdminUser} = require('./models/User');
 const isAdmin = require('./middlewares/isAdmin');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const Post = require('./models/Posts');
+const Category = require('./models/Category');
 
+require('dotenv').config();
 
 
 routes.get('/', async (req, res) => {
@@ -69,13 +73,22 @@ routes.delete('/admin/delete/:username', auth, isAdmin, async (req, res) => {
   }
 });
 
-routes.put('/admin/update/:username', auth, isAdmin, async (req, res) => {
-  try {
-    const user = await User.findOne({ username: req.params.username });
+routes.put('/admin/update/', auth, isAdmin, async (req, res) => {
+    try {
+
+    const user = await User.findOne({ username: req.body.username });
+    
     if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
+
     user.set(req.body);
+    
+    if (req.body.newUsername) {
+      user.username = req.body.newUsername;
+    }
+    user.password = await bcrypt.hash(req.body.password, 10);
+
     await user.save();
     res.json(user);
   } catch (error) {
@@ -85,25 +98,168 @@ routes.put('/admin/update/:username', auth, isAdmin, async (req, res) => {
 }
 );
 
-router.put('/user/update/:username', auth, async (req, res) => {
+routes.post('/posts/create',auth, async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.params.username });
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
+    const { authorization } = req.headers;
+    const { title, content, categoryId } = req.body;	
+
+    const splited = authorization.split(' ')[1];
+    const decoded = jwt.verify(splited, process.env.SECRET_KEY);
+    const post = new Post({ title, content, author: decoded._id });
+    if (categoryId) {
+      post.categories.push(categoryId);
     }
-    if (req.user.username !== user.username && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Você não tem permissão para atualizar este usuário' });
-    }
-    user.set(req.body);
-    await user.save();
-    res.json(user);
+    await post.save();
+    res.status(201).json(post);
   } catch (error) {
-    console.error(error); // Imprime o erro no console
-    res.status(500).json({ error: 'Erro ao atualizar o usuário', details: error.message }); // Envia o erro na resposta
+    res.status(500).json({ error: 'Erro ao criar o post', errorMessage: error.toString() });
   }
 });
 
-routes
+
+routes.put("/posts/update", auth, async (req, res) => {
+  try {
+    const { authorization } = req.headers;
+    const { title, content, categoryId, postId } = req.body;
+    const splited = authorization.split(' ')[1];
+    const decoded = jwt.verify(splited, process.env.SECRET_KEY);
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ error: 'Post não encontrado' });
+    }
+    if (post.author.toString() !== decoded._id && decoded.role !== 'admin') {
+      return res.status(401).json({ error: 'Você não tem permissão para editar este post' });
+    }
+    post.set(req.body);
+    if (categoryId) {
+      const categoryExists = post.categories.find((category) => category.toString() === categoryId);
+      if (!categoryExists) {
+        post.categories.push(categoryId);
+      } else {
+        return res.status(201).json({ message: 'Categoria inserida já existe no Post' });
+      }
+    } 
+    await post.save();
+    res.json(post);
+      
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao editar o post', errorMessage: error.toString() });
+  }
+});
+
+routes.delete('/posts/delete', auth, async (req, res) => {
+  try {
+    const { authorization } = req.headers;
+    const { postId } = req.body;
+    const splited = authorization.split(' ')[1];
+    const decoded = jwt.verify(splited, process.env.SECRET_KEY);
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ error: 'Post não encontrado' });
+    }
+    if (post.author.toString() !== decoded._id && decoded.role !== 'admin') {
+      return res.status(401).json({ error: 'Você não tem permissão para excluir este post' });
+    }
+    await post.delete();
+    res.json({ message: 'Post excluído com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir o post', errorMessage: error.toString() });
+  }
+});
+
+routes.put('/posts/remove-category', auth, async (req, res) => {
+  try {
+    const { authorization } = req.headers;
+    const { categoryId, postId } = req.body;
+    const splited = authorization.split(' ')[1];
+    const decoded = jwt.verify(splited, process.env.SECRET_KEY);
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ error: 'Post não encontrado' });
+    }
+    if (post.author.toString() !== decoded._id && decoded.role !== 'admin') {
+      return res.status(401).json({ error: 'Você não tem permissão para editar este post' });
+    }
+    post.categories = post.categories.filter((category) => category.toString() !== categoryId);
+    await post.save();
+    res.json(post);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao editar o post', errorMessage: error.toString() });
+  }
+})
+
+routes.get('/posts/find-one', auth, async (req, res) => {
+  try {
+    const { postId } = req.body;
+    const post = await Post.findById(postId).populate({ path: 'author categories', select: '-password' });
+    if (!post) {
+      return res.status(404).json({ error: 'Post não encontrado' });
+    }
+    res.json(post);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar o post', errorMessage: error.toString() });
+  }
+});
+
+routes.get('/posts/find-all', auth, async (req, res) => {
+  try {
+    const posts = await Post.find({}).populate({ path: 'author categories', select: '-password' });
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar os posts', errorMessage: error.toString() });
+  }
+});
+
+routes.get('/posts/find-by-category', auth, async (req, res) => {
+  try {
+    const { categoryId } = req.body;
+    const posts = await Post.find({ categories: categoryId }).populate({ path: 'author categories', select: '-password' });
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar os posts', errorMessage: error.toString() });
+  }
+});
+
+routes.post('/category/create', auth, async (req, res) => {
+  try {
+    const { title } = req.body;
+    const category = new Category({ title});
+    await category.save();
+    res.status(201).json(category);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar a categoria', errorMessage: error.toString() });
+  }
+});
+
+routes.get('/category', auth, async (req, res) => {
+  try {
+    const category = await Category.find({});
+    res.json(category);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar as categorias', errorMessage: error.toString() });
+  }
+});
+
+routes.delete('/category/delete', auth, async (req, res) => {
+  try {
+    const { categoryId } = req.body;
+    const category = await Category.findOneAndDelete(categoryId);
+    if (!category) {
+      return res.status(404).json({ error: 'Categoria não encontrada' });
+    }
+    const posts = await Post.find({ categories: categoryId }).populate({ path: 'author categories', select: '-password' });
+    if (posts) {
+      for (const post of posts) {
+        post.categories = post.categories.filter((category) => category.toString() !== categoryId);
+        await post.save();
+      }
+    }
+
+    res.json({ message: 'Categoria excluída com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir a categoria', errorMessage: error.toString() });
+  }
+});
 
 
 routes.post('/users', UserController.createUser);
