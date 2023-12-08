@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const Post = require('./models/Posts');
 const Category = require('./models/Category');
+const Comments = require('./models/Comments');
 
 require('dotenv').config();
 
@@ -92,7 +93,7 @@ routes.put('/admin/update/', auth, isAdmin, async (req, res) => {
     await user.save();
     res.json(user);
   } catch (error) {
-    console.error(error); // Imprime o erro no console
+    console.error(error); 
     res.status(500).json({ error: 'Erro ao atualizar o usuário', details: error.message }); // Envia o erro na resposta
   }
 }
@@ -109,6 +110,9 @@ routes.post('/posts/create',auth, async (req, res) => {
     if (categoryId) {
       post.categories.push(categoryId);
     }
+    if(commentId){
+      post.comments.push(commentId);
+    }
     await post.save();
     res.status(201).json(post);
   } catch (error) {
@@ -120,7 +124,7 @@ routes.post('/posts/create',auth, async (req, res) => {
 routes.put("/posts/update", auth, async (req, res) => {
   try {
     const { authorization } = req.headers;
-    const { title, content, categoryId, postId } = req.body;
+    const { title, content, categoryId, postId, commentId } = req.body;
     const splited = authorization.split(' ')[1];
     const decoded = jwt.verify(splited, process.env.SECRET_KEY);
     const post = await Post.findById(postId);
@@ -139,6 +143,10 @@ routes.put("/posts/update", auth, async (req, res) => {
         return res.status(201).json({ message: 'Categoria inserida já existe no Post' });
       }
     } 
+    if(commentId){
+      const commentExists = post.comments.find((comment) => comment.toString() === commentId);
+        post.comments.push(commentId);
+    }
     await post.save();
     res.json(post);
       
@@ -191,7 +199,7 @@ routes.put('/posts/remove-category', auth, async (req, res) => {
 routes.get('/posts/find-one', auth, async (req, res) => {
   try {
     const { postId } = req.body;
-    const post = await Post.findById(postId).populate({ path: 'author categories', select: '-password' });
+    const post = await Post.findById(postId).populate({ path: 'author categories comments', select: '-password' });
     if (!post) {
       return res.status(404).json({ error: 'Post não encontrado' });
     }
@@ -203,7 +211,7 @@ routes.get('/posts/find-one', auth, async (req, res) => {
 
 routes.get('/posts/find-all', auth, async (req, res) => {
   try {
-    const posts = await Post.find({}).populate({ path: 'author categories', select: '-password' });
+    const posts = await Post.find({}).populate({ path: 'author categories comments ', select: '-password' });
     res.json(posts);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar os posts', errorMessage: error.toString() });
@@ -213,7 +221,7 @@ routes.get('/posts/find-all', auth, async (req, res) => {
 routes.get('/posts/find-by-category', auth, async (req, res) => {
   try {
     const { categoryId } = req.body;
-    const posts = await Post.find({ categories: categoryId }).populate({ path: 'author categories', select: '-password' });
+    const posts = await Post.find({ categories: categoryId }).populate({ path: 'author categories comments', select: '-password' });
     res.json(posts);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar os posts', errorMessage: error.toString() });
@@ -258,6 +266,61 @@ routes.delete('/category/delete', auth, async (req, res) => {
     res.json({ message: 'Categoria excluída com sucesso' });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao excluir a categoria', errorMessage: error.toString() });
+  }
+});
+
+  routes.post('/comments/create', auth, async (req, res) => {
+  try {
+    const { authorization } = req.headers;
+    const { content, postId } = req.body;
+    const splited = authorization.split(' ')[1];
+    const decoded = jwt.verify(splited, process.env.SECRET_KEY);
+    const comment = new Comments({ content, post: postId, author: decoded._id });
+    await comment.save();
+    res.status(201).json(comment);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar o comentário', errorMessage: error.toString() });
+  }
+});
+
+  routes.put('/comments/update', auth, async (req, res) => {
+  try {
+    const { authorization } = req.headers;
+    const { content, commentId } = req.body;
+    const splited = authorization.split(' ')[1];
+    const decoded = jwt.verify(splited, process.env.SECRET_KEY);
+    const comment = await Comments.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ error: 'Comentário não encontrado' });
+    }
+    if (comment.author.toString() !== decoded._id && decoded.role !== 'admin') {
+      return res.status(401).json({ error: 'Você não tem permissão para editar este comentário' });
+    }
+    comment.set(req.body);
+    await comment.save();
+    res.json(comment);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao editar o comentário', errorMessage: error.toString() });
+  }
+});
+
+  routes.delete('/comments/delete', auth, async (req, res) => {
+  try {
+    const { authorization } = req.headers;
+    const { commentId } = req.body;
+    const splited = authorization.split(' ')[1];
+    const decoded = jwt.verify(splited, process.env.SECRET_KEY);
+    const comment = await Comments.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ error: 'Comentário não encontrado' });
+    }
+    if (comment.author.toString() !== decoded._id && decoded.role !== 'admin') {
+      return res.status(401).json({ error: 'Você não tem permissão para excluir este comentário' });
+    }
+    await comment.delete();
+    res.json({ message: 'Comentário excluído com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir o comentário', errorMessage: error.toString() });
   }
 });
 
