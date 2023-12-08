@@ -1,22 +1,72 @@
-const {Router} = require('express');
+const { Router } = require('express');
 const routes = new Router();
 const UserController = require('./controllers/UserController');
-const {register, login} = require('./controllers/AuthController');
-const  auth  = require('./middlewares/auth');
-const {User ,createAdminUser} = require('./models/User');
+const { register, login } = require('./controllers/AuthController');
+const auth = require('./middlewares/auth');
+const { User, createAdminUser } = require('./models/User');
 const isAdmin = require('./middlewares/isAdmin');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const Post = require('./models/Posts');
 const Category = require('./models/Category');
 const Comments = require('./models/Comments');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+const { MockUsers, MockCategories, MockPosts, MockComments } = require('./mock/install');
 
 require('dotenv').config();
 
+const options = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'API',
+      version: '1.0.0',
+    },
+    components: {
+      schemas: {
+        Post: {
+          type: 'object',
+          properties: {
+            _id: {
+              type: 'string',
+            },
+            title: {
+              type: 'string',
+            },
+            content: {
+              type: 'string',
+            },
+            author: {
+              type: 'string',
+            },
+            categories: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+            },
+            comments: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  apis: ['./routes.js'], // caminho para os arquivos onde as rotas estão definidas
+};
+
+const specs = swaggerJsdoc(options);
+
+routes.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 routes.get('/', async (req, res) => {
-    await createAdminUser();
-    res.send('Hello World');
+  await createAdminUser();
+  res.send('Welcome');
 });
 
 
@@ -75,16 +125,16 @@ routes.delete('/admin/delete/:username', auth, isAdmin, async (req, res) => {
 });
 
 routes.put('/admin/update/', auth, isAdmin, async (req, res) => {
-    try {
+  try {
 
     const user = await User.findOne({ username: req.body.username });
-    
+
     if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
     user.set(req.body);
-    
+
     if (req.body.newUsername) {
       user.username = req.body.newUsername;
     }
@@ -93,16 +143,48 @@ routes.put('/admin/update/', auth, isAdmin, async (req, res) => {
     await user.save();
     res.json(user);
   } catch (error) {
-    console.error(error); 
+    console.error(error);
     res.status(500).json({ error: 'Erro ao atualizar o usuário', details: error.message }); // Envia o erro na resposta
   }
 }
 );
 
-routes.post('/posts/create',auth, async (req, res) => {
+/**
+ * @swagger
+ * /posts/create:
+ *   post:
+ *     summary: Cria um novo post
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               content:
+ *                 type: string
+ *               categoryId:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: O post foi criado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Post'
+ *       500:
+ *         description: Erro ao criar o post
+ */
+routes.post('/posts/create', auth, async (req, res) => {
   try {
+
     const { authorization } = req.headers;
-    const { title, content, categoryId } = req.body;	
+    const { title, content, categoryId } = req.body;
 
     const splited = authorization.split(' ')[1];
     const decoded = jwt.verify(splited, process.env.SECRET_KEY);
@@ -110,7 +192,7 @@ routes.post('/posts/create',auth, async (req, res) => {
     if (categoryId) {
       post.categories.push(categoryId);
     }
-    if(commentId){
+    if (commentId) {
       post.comments.push(commentId);
     }
     await post.save();
@@ -142,14 +224,14 @@ routes.put("/posts/update", auth, async (req, res) => {
       } else {
         return res.status(201).json({ message: 'Categoria inserida já existe no Post' });
       }
-    } 
-    if(commentId){
+    }
+    if (commentId) {
       const commentExists = post.comments.find((comment) => comment.toString() === commentId);
-        post.comments.push(commentId);
+      post.comments.push(commentId);
     }
     await post.save();
     res.json(post);
-      
+
   } catch (error) {
     res.status(500).json({ error: 'Erro ao editar o post', errorMessage: error.toString() });
   }
@@ -199,7 +281,19 @@ routes.put('/posts/remove-category', auth, async (req, res) => {
 routes.get('/posts/find-one', auth, async (req, res) => {
   try {
     const { postId } = req.body;
-    const post = await Post.findById(postId).populate({ path: 'author categories comments', select: '-password' });
+    const post = await Post.findById(postId)
+      .populate({
+        path: 'author categories',
+        select: '-password'
+      })
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'author',
+          model: 'User',
+          select: '-password'
+        }
+      });
     if (!post) {
       return res.status(404).json({ error: 'Post não encontrado' });
     }
@@ -209,9 +303,17 @@ routes.get('/posts/find-one', auth, async (req, res) => {
   }
 });
 
-routes.get('/posts/find-all', auth, async (req, res) => {
+routes.get('/posts/find-all/:limmit/:page', auth, async (req, res) => {
   try {
-    const posts = await Post.find({}).populate({ path: 'author categories comments ', select: '-password' });
+    const limmit = parseInt(req.params.limmit);
+    const page = parseInt(req.params.page);
+    const skip = (page - 1) * limmit;
+
+    const posts = await Post.find({})
+      .populate({ path: 'author categories comments', select: '-password' })
+      .skip(skip)
+      .limit(limmit);
+
     res.json(posts);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar os posts', errorMessage: error.toString() });
@@ -231,7 +333,7 @@ routes.get('/posts/find-by-category', auth, async (req, res) => {
 routes.post('/category/create', auth, async (req, res) => {
   try {
     const { title } = req.body;
-    const category = new Category({ title});
+    const category = new Category({ title });
     await category.save();
     res.status(201).json(category);
   } catch (error) {
@@ -269,27 +371,40 @@ routes.delete('/category/delete', auth, async (req, res) => {
   }
 });
 
-  routes.post('/comments/create', auth, async (req, res) => {
+routes.post('/comments/create', auth, async (req, res) => {
   try {
     const { authorization } = req.headers;
     const { content, postId } = req.body;
     const splited = authorization.split(' ')[1];
     const decoded = jwt.verify(splited, process.env.SECRET_KEY);
-    const comment = new Comments({ content, post: postId, author: decoded._id });
-    await comment.save();
+    console.log("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH:  " + decoded._id);
+    const comentario = {
+      content: content,
+      author: decoded._id
+    }
+    const comment = new Comments(comentario);
+    await comment.save().then(async (comment) => {
+      const post = await Post.findById(postId);
+      if (!post) {
+        return res.status(404).json({ error: 'Post não encontrado' });
+      }
+      post.comments.push(comment._id);
+      await post.save();
+    });
+
     res.status(201).json(comment);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao criar o comentário', errorMessage: error.toString() });
   }
 });
 
-  routes.put('/comments/update', auth, async (req, res) => {
+routes.put('/comments/update', auth, async (req, res) => {
   try {
     const { authorization } = req.headers;
     const { content, commentId } = req.body;
     const splited = authorization.split(' ')[1];
     const decoded = jwt.verify(splited, process.env.SECRET_KEY);
-    const comment = await Comments.findById(commentId);
+    const comment = await Comments.find(commentId);
     if (!comment) {
       return res.status(404).json({ error: 'Comentário não encontrado' });
     }
@@ -304,7 +419,7 @@ routes.delete('/category/delete', auth, async (req, res) => {
   }
 });
 
-  routes.delete('/comments/delete', auth, async (req, res) => {
+routes.delete('/comments/delete', auth, async (req, res) => {
   try {
     const { authorization } = req.headers;
     const { commentId } = req.body;
@@ -317,18 +432,68 @@ routes.delete('/category/delete', auth, async (req, res) => {
     if (comment.author.toString() !== decoded._id && decoded.role !== 'admin') {
       return res.status(401).json({ error: 'Você não tem permissão para excluir este comentário' });
     }
-    await comment.delete();
-    res.json({ message: 'Comentário excluído com sucesso' });
+    const comments = await Comments.find({ comment: commentId }).populate({ path: 'author', select: '-password' });
+    if (comments) {
+      for (const comment of comments) {
+        post.comments = post.comments.filter((comment) => comment.toString() !== commentId);
+        await post.save();
+      }
+    }
   } catch (error) {
     res.status(500).json({ error: 'Erro ao excluir o comentário', errorMessage: error.toString() });
   }
-});
+}
+);
+
+routes.get("/install", async (req, res) => {
+  try {
+    
+    // USUARIOS
+
+    const users = await User.insertMany(MockUsers);
+
+    // CATEGORIAS
+    const categories = await Category.insertMany(MockCategories);
+
+    // COMENTARIOS
+
+    let commentsConfig = [];
+    MockComments.forEach(async (comment) => {
+      const author = users[Math.floor(Math.random() * users.length)];
+      comment.author = author._id;
+      commentsConfig.push(comment);
+    });
+    const comments = await Comments.insertMany(commentsConfig);
+
+    // POST
+    
+    let postsConfig = [];
+    MockPosts.forEach(async (post) => {
+      const author = users[Math.floor(Math.random() * users.length)];
+      post.author = author._id;
+      const category = categories[Math.floor(Math.random() * categories.length)];
+      post.categories.push(category._id);
+      const comment = comments[Math.floor(Math.random() * comments.length)];
+      post.comments.push(comment._id);
+      postsConfig.push(post);
+    });
+    const posts = await Post.insertMany(postsConfig);
+
+    // MockPosts.forEach(async (post) => {});
+    
+    res.status(200).json({ message: "Dados inicializados com sucesso!" });
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao criar dados iniciais.", errorMessage: error.toString()  });
+  }
+}
+);
 
 
-routes.post('/users', UserController.createUser);
-routes.get('/users/:username', UserController.getUser);
-routes.put('/users/:username', UserController.updateUser);
-routes.delete('/users/:username', UserController.deleteUser);
+
+// routes.post('/users', UserController.createUser);
+// routes.get('/users/:username', UserController.getUser);
+// routes.put('/users/:username', UserController.updateUser);
+// routes.delete('/users/:username', UserController.deleteUser);
 
 
 module.exports = routes;
