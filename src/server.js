@@ -1,6 +1,6 @@
 const app = require('./app')
 const mongoose = require('mongoose');
-const { createAdminUser } = require('./models/Admin');
+
 
 
 
