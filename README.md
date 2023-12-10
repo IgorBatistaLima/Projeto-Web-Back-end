@@ -51,4 +51,4 @@ Utileze Mongodb, tenha instalado postman insomnia
 - `GET /install`: realiza a instalação do banco
 de dados
 
-`GET /docs`: a documentação gerada pela ferramenta Swagger
+-`GET /docs`: a documentação gerada pela ferramenta Swagger
