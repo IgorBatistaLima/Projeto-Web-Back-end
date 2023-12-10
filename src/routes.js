@@ -336,9 +336,7 @@ routes.post('/posts/create', auth, async (req, res) => {
     if (categoryId) {
       post.categories.push(categoryId);
     }
-    if (commentId) {
-      post.comments.push(commentId);
-    }
+    
     await post.save();
     res.status(201).json(post);
   } catch (error) {
