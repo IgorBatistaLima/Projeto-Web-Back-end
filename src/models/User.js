@@ -25,25 +25,6 @@ const UserSchema = new Schema({
 });
 
 
-// async function createAdminUser() {
-//     const adminUser = await User.findOne({ username: 'admin' });
-//     const saltRounds = 10;
-//     const hashedPassword = await bcrypt.hash('admin123', saltRounds);
-    
-//     if (!adminUser) {
-//       const admin = new User({
-//         username: 'admin',
-//         password: hashedPassword,
-//         email: 'admin@example.com',
-//         role: 'admin',
-//       });
-      
-//       admin.save()
-//         .then(() => console.log('Admin user created'))
-//         .catch(err => console.log('Error: ' + err));
-//     }
-// }
-
 UserSchema.methods.comparePassword = function (password) {
     return bcrypt.compare(password, this.password);
 };
