@@ -1,13 +1,15 @@
 const express = require('express');
 const mongoose = require('mongoose');
 
+require('dotenv').config();
+
 
 
 class App {
     constructor() {
         this.serve = express();
 
-        mongoose.connect('mongodb+srv://igorbatistalima1:projetofinal123@cluster0.j9tun0k.mongodb.net/?retryWrites=true&w=majority',{
+        mongoose.connect(process.env.DATABASE_URL,{
             // useNewUrlParser: true,
             // useUnifiedTopology: true,
 
