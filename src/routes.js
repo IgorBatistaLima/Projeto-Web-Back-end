@@ -14,50 +14,120 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const { MockUsers, MockCategories, MockPosts, MockComments } = require('./mock/install');
 
+
 require('dotenv').config();
 
 const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'API',
+      title: 'Blog API',
       version: '1.0.0',
+      description: 'API para um blog',
+      contact: {
+        name: 'Rafael Alves',
+        email: ''
+      },
     },
+    servers: [
+      {
+        url: 'http://localhost:3000'
+      }
+    ],
+
     components: {
       schemas: {
+        User: {
+          type: 'object',
+          properties: {
+            _id: {
+              type: 'string',
+              description: 'ID do usuário'
+            },
+            name: {
+              type: 'string',
+              description: 'Nome do usuário'
+            },
+            username: {
+              type: 'string',
+              description: 'Nome de usuário'
+            },
+            password: {
+              type: 'string',
+              description: 'Senha do usuário'
+            },
+            role: {
+              type: 'string',
+              description: 'Função do usuário'
+            }
+          }
+        },
         Post: {
           type: 'object',
           properties: {
             _id: {
               type: 'string',
+              description: 'ID do post'
             },
             title: {
               type: 'string',
+              description: 'Título do post'
             },
             content: {
               type: 'string',
+              description: 'Conteúdo do post'
             },
-            author: {
+
+          }
+        },
+        Category: {
+          type: 'object',
+          properties: {
+            _id: {
               type: 'string',
+              description: 'ID da categoria'
             },
-            categories: {
-              type: 'array',
-              items: {
-                type: 'string',
-              },
+            title: {
+              type: 'string',
+              description: 'Título da categoria'
+            }
+          }
+        },
+        Comments: {
+          type: 'object',
+          properties: {
+            _id: {
+              type: 'string',
+              description: 'ID do comentário'
             },
-            comments: {
-              type: 'array',
-              items: {
-                type: 'string',
-              },
+            content: {
+              type: 'string',
+              description: 'Conteúdo do comentário'
             },
-          },
+
+          }
         },
       },
+
+      securitySchemes: {
+
+        bearerAuth: {
+
+          type: 'http',
+
+          scheme: 'bearer',
+
+          bearerFormat: 'JWT',
+
+        },
+
+      },
     },
+    security: [{
+      bearerAuth: [],
+    }],
   },
-  apis: ['./routes.js'], // caminho para os arquivos onde as rotas estão definidas
+  apis: ['./src/routes.js'],
 };
 
 const specs = swaggerJsdoc(options);
@@ -65,7 +135,6 @@ const specs = swaggerJsdoc(options);
 routes.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 routes.get('/', async (req, res) => {
-  await createAdminUser();
   res.send('Welcome');
 });
 
@@ -73,6 +142,111 @@ routes.get('/', async (req, res) => {
 routes.post('/register', register);
 routes.post('/login', login);
 
+
+/**
+ * @swagger
+ * /users:
+ *   get:
+ *     summary: Retorna a lista de usuários
+ *     description: Esta rota retorna uma lista de todos os usuários registrados no sistema.
+ *     tags:
+ *       - Users
+ *     responses:
+ *       200:
+ *         description: A lista de usuários
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro do servidor
+ */
+
+/**
+ * @swagger
+ * /posts/find-all/{limmit}/{page}:
+ *   get:
+ *     summary: Retorna a lista de postagens
+ *     description: Esta rota retorna uma lista de todas as postagens no sistema.
+ *     tags:
+ *       - Posts
+ *     parameters:
+ *       - in: path
+ *         name: limmit
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: O número de postagens para retornar
+ *       - in: path
+ *         name: page
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: A página de postagens para retornar
+ *     responses:
+ *       200:
+ *         description: A lista de postagens
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Post'
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro do servidor
+ */
+
+/**
+ * @swagger
+ * /category:
+ *   get:
+ *     summary: Retorna a lista de categorias
+ *     description: Esta rota retorna uma lista de todas as categorias no sistema.
+ *     tags:
+ *       - Categories
+ *     responses:
+ *       200:
+ *         description: A lista de categorias
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Category'
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro do servidor
+ */
+
+/**
+ * @swagger
+ * /comments/find-all:
+ *   get:
+ *     summary: Retorna a lista de comentários
+ *     description: Esta rota retorna uma lista de todos os comentários no sistema.
+ *     tags:
+ *       - Comments
+ *     responses:
+ *       200:
+ *         description: A lista de comentários
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Comments'
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro do servidor
+ */
 routes.get('/users', auth, async (req, res) => {
   const users = await User.find({});
   res.json(users);
@@ -149,37 +323,7 @@ routes.put('/admin/update/', auth, isAdmin, async (req, res) => {
 }
 );
 
-/**
- * @swagger
- * /posts/create:
- *   post:
- *     summary: Cria um novo post
- *     tags: [Posts]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *               content:
- *                 type: string
- *               categoryId:
- *                 type: string
- *     responses:
- *       201:
- *         description: O post foi criado com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Post'
- *       500:
- *         description: Erro ao criar o post
- */
+
 routes.post('/posts/create', auth, async (req, res) => {
   try {
 
@@ -303,6 +447,8 @@ routes.get('/posts/find-one', auth, async (req, res) => {
   }
 });
 
+
+
 routes.get('/posts/find-all/:limmit/:page', auth, async (req, res) => {
   try {
     const limmit = parseInt(req.params.limmit);
@@ -341,6 +487,7 @@ routes.post('/category/create', auth, async (req, res) => {
   }
 });
 
+
 routes.get('/category', auth, async (req, res) => {
   try {
     const category = await Category.find({});
@@ -377,7 +524,6 @@ routes.post('/comments/create', auth, async (req, res) => {
     const { content, postId } = req.body;
     const splited = authorization.split(' ')[1];
     const decoded = jwt.verify(splited, process.env.SECRET_KEY);
-    console.log("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH:  " + decoded._id);
     const comentario = {
       content: content,
       author: decoded._id
@@ -445,9 +591,19 @@ routes.delete('/comments/delete', auth, async (req, res) => {
 }
 );
 
+routes.get('/comments/find-all', auth, async (req, res) => {
+  try {
+    const comments = await Comments.find({}).populate({ path: 'author', select: '-password' });
+    res.json(comments);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar os comentários', errorMessage: error.toString() });
+  }
+});
+
+
 routes.get("/install", async (req, res) => {
   try {
-    
+
     // USUARIOS
 
     const users = await User.insertMany(MockUsers);
@@ -466,7 +622,7 @@ routes.get("/install", async (req, res) => {
     const comments = await Comments.insertMany(commentsConfig);
 
     // POST
-    
+
     let postsConfig = [];
     MockPosts.forEach(async (post) => {
       const author = users[Math.floor(Math.random() * users.length)];
@@ -479,21 +635,17 @@ routes.get("/install", async (req, res) => {
     });
     const posts = await Post.insertMany(postsConfig);
 
-    // MockPosts.forEach(async (post) => {});
     
+
     res.status(200).json({ message: "Dados inicializados com sucesso!" });
   } catch (error) {
-    res.status(500).json({ error: "Erro ao criar dados iniciais.", errorMessage: error.toString()  });
+    res.status(500).json({ error: "Erro ao criar dados iniciais.", errorMessage: error.toString() });
   }
 }
 );
 
 
 
-// routes.post('/users', UserController.createUser);
-// routes.get('/users/:username', UserController.getUser);
-// routes.put('/users/:username', UserController.updateUser);
-// routes.delete('/users/:username', UserController.deleteUser);
 
 
 module.exports = routes;
